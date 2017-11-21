@@ -1,7 +1,7 @@
 from setuptools import setup
 
 setup(
-    name='livemaptile',
+    name='livemaptiles',
     version='0.1.0',
-    py_modules=['livemaptile'],
+    py_modules=['livemaptiles'],
     )
