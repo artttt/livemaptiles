@@ -5,6 +5,10 @@ Consider this as an early preview version. If you use it feedback is appreciated
 
 To help you get started it is recommended that you work through livemaptiles_demo.ipynb
 
+a couple of things that might trip you up early on.
+ - Wont work outside of a Jupyter notbook.
+ - it uses port 8080 by default on import. If that is in use you will get some errors. However you can change the port and then start the server 
+
 you can install it directly from github like this
 ```
 pip install https://github.com/artttt/livemaptiles/zipball/master
