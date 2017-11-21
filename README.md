@@ -7,7 +7,7 @@ To help you get started it is recommended that you work through livemaptiles_dem
 
 you can install it directly from github like this
 ```
-pip install https://github.com/artttt/livemaptile/zipball/master
+pip install https://github.com/artttt/livemaptiles/zipball/master
 ```
 
 I havnt documented the dependancies as yet but here is the list of imports needed
