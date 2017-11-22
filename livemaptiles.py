@@ -197,15 +197,18 @@ class arrayTile(object):
         coords = np.meshgrid(xarr,xarr)
         
         #speed things up if a full projection is not required
-        #pyproj  projects even if p1 and p2 are the same. Also if p1 and p2 share a datum less work is required
+        #pyproj transform takes a while even if p1 and p2 are the same. Also if p1 and p2 share a datum less work is required
         #datum check isnt exhustive but if the projection is defined with an epsg code then it will catch it.
         same_projection = 'epsg:3857' in p2.srs
         epsg_srs = re.search(r'epsg:(\d{4})',p2.srs)
         same_datum = epsg_srs and epsg_srs.group(1) in self._epsg_with_wgs84_datum
         if same_projection:
             float_indexes = inverse_src_affine * (dst_affine * coords)
-        elif same_datum:
+        elif 'epsg:4326' in p2.srs:
+            #wgs84 plate carree projection ie geographic projection with same datum as epsg:3857
             float_indexes = inverse_src_affine * p1(*(dst_affine * coords),inverse=True)
+        elif same_datum:
+            float_indexes = inverse_src_affine * p2(*p1(*(dst_affine * coords),inverse=True))
         else:
             float_indexes = inverse_src_affine * pyproj.transform(p1, p2, *(dst_affine * coords))
 
