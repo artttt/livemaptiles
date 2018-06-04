@@ -219,7 +219,12 @@ class arrayTile(object):
 
         #bounds checking
         valid_indexes = (indexes[0]>=0) & (indexes[0]<=self.in_array.shape[0]-1) & (indexes[1]>=0) & (indexes[1]<=self.in_array.shape[1]-1)
-        valid_values = self.in_array[indexes[0][valid_indexes],indexes[1][valid_indexes]]
+        if hasattr(self.in_array,'vindex'):
+            #oooh we might have something like a zarr array
+            valid_values = self.in_array.vindex[indexes[0][valid_indexes],indexes[1][valid_indexes]]
+        else:
+            #just an ndarray
+            valid_values = self.in_array[indexes[0][valid_indexes],indexes[1][valid_indexes]]
         outData = np.zeros((numPixels,numPixels),dtype=np.float)
         outData[valid_indexes] = valid_values
         return outData
