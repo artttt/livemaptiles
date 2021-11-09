@@ -1,7 +1,6 @@
 __all__ = ['tileServer','fileTile','arrayTile']
 import os
 import re
-#import tornado.ioloop
 import tornado.web
 
 from io import BytesIO
@@ -10,7 +9,7 @@ import mercantile
 from affine import Affine
 import rasterio
 import numpy as np
-import pyproj
+from pyproj import Transformer,CRS
 
 from matplotlib import cm
 
@@ -149,13 +148,6 @@ class memfileTile(object):
                 im = Image.fromarray(np.transpose(data, [1,2,0]))
                 return im
 
-
-def _datum_check():
-    textfile = open(os.path.join(pyproj.pyproj_datadir,'epsg'), 'r')
-    filetext = textfile.read()
-    textfile.close()
-    return re.findall(r"\n<(\d{4})>.*datum=WGS84", filetext)
-            
 class arrayTile(object):
     '''tile maker for a 2d numpy array
     
@@ -167,13 +159,17 @@ class arrayTile(object):
     def __init__(self,in_array,in_affine,in_crs):
         self.in_array = in_array
         self.in_affine = in_affine
+        self.inverse_src_affine = ~self.in_affine
         self.in_crs = in_crs
+        self.numPixels = 256
         self.colourMap = cm.binary
         self.scale_min = 0
         self.scale_max = 1
         self.alpha = None
-        self._epsg_with_wgs84_datum = _datum_check()
-
+        #interesting background info on plate carree projection ie geographic projection
+        #https://idvux.wordpress.com/2007/06/06/mercator-vs-well-not-mercator-platte-carre/
+        #EPSG:4326 wgs84, 3857 is spherical mercator
+        self.transformer = Transformer.from_crs(3857,self.in_crs,skip_equivalent=True,always_xy=True)
 
     def array_resampler(self,z,x,y):
         '''
@@ -181,37 +177,15 @@ class arrayTile(object):
         instead of reprojecting the array it projects points that represent the cell centres in the desired output array
         These points are then used to select the cells in the input array
         '''
-        #interesting background info on plate carree projection ie geographic projection
-        #https://idvux.wordpress.com/2007/06/06/mercator-vs-well-not-mercator-platte-carre/
-        numPixels = 256
-        #EPSG:4326 wgs84
-        #3857 is spherical mercator
-        p1 = pyproj.Proj(init='epsg:3857')
-        p2 = pyproj.Proj(self.in_crs)
-        inverse_src_affine = ~self.in_affine
-
         #make_transform
-        dst_affine =rasterio.transform.from_bounds(*mercantile.xy_bounds(x,y,z), width=numPixels,height=numPixels)
+        dst_affine =rasterio.transform.from_bounds(*mercantile.xy_bounds(x,y,z), width=self.numPixels,height=self.numPixels)
 
-        xarr = np.arange(0,numPixels)
+        xarr = np.arange(0,self.numPixels)
         coords = np.meshgrid(xarr,xarr)
         
-        #speed things up if a full projection is not required
-        #pyproj transform takes a while even if p1 and p2 are the same. Also if p1 and p2 share a datum less work is required
-        #datum check isnt exhustive but if the projection is defined with an epsg code then it will catch it.
-        same_projection = 'epsg:3857' in p2.srs
-        epsg_srs = re.search(r'epsg:(\d{4})',p2.srs)
-        same_datum = epsg_srs and epsg_srs.group(1) in self._epsg_with_wgs84_datum
-        if same_projection:
-            float_indexes = inverse_src_affine * (dst_affine * coords)
-        elif 'epsg:4326' in p2.srs:
-            #wgs84 plate carree projection ie geographic projection with same datum as epsg:3857
-            float_indexes = inverse_src_affine * p1(*(dst_affine * coords),inverse=True)
-        elif same_datum:
-            float_indexes = inverse_src_affine * p2(*p1(*(dst_affine * coords),inverse=True))
-        else:
-            float_indexes = inverse_src_affine * pyproj.transform(p1, p2, *(dst_affine * coords))
-
+        float_indexes = self.inverse_src_affine * self.transformer.transform(*(dst_affine * coords))
+            
+            
         indexes =(np.floor(float_indexes[1]).astype(int),np.floor(float_indexes[0]).astype(int))
 
         #simpler fancy indexing but doesnt do any bounds checking
@@ -225,7 +199,7 @@ class arrayTile(object):
         else:
             #just an ndarray
             valid_values = self.in_array[indexes[0][valid_indexes],indexes[1][valid_indexes]]
-        outData = np.zeros((numPixels,numPixels),dtype=np.float)
+        outData = np.zeros((self.numPixels,self.numPixels),dtype=np.float)
         outData[valid_indexes] = valid_values
         return outData
     
